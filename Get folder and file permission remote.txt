@@ -1,0 +1,114 @@
+aaa
+
+using system.net;
+using System;
+using System.Collections.Generic;
+using System.Management.Automation;
+using System.Security.AccessControl;
+
+class Program
+{
+    static void Main()
+    {
+        // Specify the path to the folder or file
+        string path = @"E:\Sankalpa";
+
+        // Specify the remote computer name
+        string remoteComputerName = "10.10.10.133";
+
+        // Create the PowerShell instance
+        using (PowerShell ps = PowerShell.Create())
+        {
+            // Establish a remote PowerShell session
+            ps.AddCommand("New-PSSession").AddParameter("ComputerName", remoteComputerName);
+
+            try
+            {
+                // Invoke the command and retrieve the remote session
+                var remoteSession = ps.Invoke<PSObject>()[0].BaseObject as System.Management.Automation.Runspaces.PSSession;
+
+                // Create a new PowerShell instance with the remote session
+                using (PowerShell remotePs = PowerShell.Create())
+                {
+                    // Set the PowerShell instance to use the remote session
+                    remotePs.Runspace = remoteSession.Runspace;
+
+                    // Add the PowerShell command to get ACL
+                    remotePs.AddCommand("Get-Acl").AddArgument(path);
+
+                    // Invoke the command and retrieve the results from the remote session
+                    var results = remotePs.Invoke();
+
+                    // Process the results
+                    List<FilePermission> filePermissions = new List<FilePermission>();
+
+                    foreach (var result in results)
+                    {
+                        // Extract the permission details
+                        string owner = result.Members["Owner"].Value.ToString();
+
+                        // Manually extract the access rules
+                        DirectorySecurity directorySecurity = result.BaseObject as DirectorySecurity;
+                        AuthorizationRuleCollection accessRules = directorySecurity.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier));
+
+                        // Store the permission details in a custom class
+                        FilePermission filePermission = new FilePermission
+                        {
+                            Path = path,
+                            Owner = owner,
+                            Access = GetAccessDetails(accessRules)
+                        };
+
+                        filePermissions.Add(filePermission);
+                    }
+
+                    // Display the permission details
+                    foreach (var permission in filePermissions)
+                    {
+                        Console.WriteLine($"Path: {permission.Path}");
+                        Console.WriteLine($"Owner: {permission.Owner}");
+                        Console.WriteLine($"Access: {permission.Access}");
+                        Console.WriteLine();
+                    }
+                }
+
+                // Remove the remote session after execution
+                ps.Commands.Clear();
+                ps.AddCommand("Remove-PSSession").AddParameter("Session", remoteSession);
+                ps.Invoke();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+        }
+
+        // Wait for user input before closing the console window
+        Console.WriteLine("Press any key to exit...");
+        Console.ReadKey();
+    }
+
+    static string GetAccessDetails(AuthorizationRuleCollection accessRules)
+    {
+        List<string> accessDetails = new List<string>();
+
+        foreach (FileSystemAccessRule rule in accessRules)
+        {
+            string identity = rule.IdentityReference.Value;
+            string accessControlType = rule.AccessControlType.ToString();
+            string fileSystemRights = rule.FileSystemRights.ToString();
+
+            string accessDetail = $"{identity} {accessControlType} {fileSystemRights}";
+            accessDetails.Add(accessDetail);
+        }
+
+        return string.Join(", ", accessDetails);
+    }
+}
+
+class FilePermission
+{
+    public string Path { get; set; }
+    public string Owner { get; set; }
+    public string Access { get; set; }
+}

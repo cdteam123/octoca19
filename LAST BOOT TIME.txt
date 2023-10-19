@@ -1,0 +1,56 @@
+
+
+ssaaaaaaaaa
+////////TEST
+using System;
+using System.IO;
+using System.Net;
+using System.Data;
+using System.Linq;
+using Ayehu.Sdk.ActivityCreation.Interfaces;
+using Ayehu.Sdk.ActivityCreation.Extension;
+using System.Diagnostics;
+
+namespace Ayehu.Sdk.ActivityCreation
+{
+    public class GetLocalUser : IActivity
+    {
+        public string targetSID = "";
+
+        public ICustomActivityResult Execute()
+        {
+            try
+            {
+                string powerShellCommand = "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -ExpandProperty LastBootUpTime";
+                string output = RunPowerShellCommand(powerShellCommand);
+
+                if (string.IsNullOrEmpty(output))
+                {
+                    throw new Exception("Failed to retrieve the Last Boot Up Time.");
+                }
+
+                return this.GenerateActivityResult("Last Boot Up Time: " + output);
+            }
+            catch (Exception ex)
+            {
+                return this.GenerateActivityResult("An error occurred: " + ex.Message);
+            }
+        }
+
+        static string RunPowerShellCommand(string command)
+        {
+            Process process = new Process();
+            process.StartInfo.FileName = "powershell.exe";
+            process.StartInfo.Arguments = "-NoProfile -Command \"" + command.Replace("\"", "\\\"") + "\"";
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.CreateNoWindow = true;
+
+            process.Start();
+            string output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            return output.Trim();
+        }
+    }
+}

@@ -1,0 +1,56 @@
+//tested and working code
+//db2c1
+
+
+
+using System;
+using System.IO;
+using System.Net;
+using Ayehu.Sdk.ActivityCreation.Interfaces;
+using Ayehu.Sdk.ActivityCreation.Extension;
+using System.Text;
+
+namespace Ayehu.Sdk.ActivityCreation
+{
+    public class FileCreationTime : IActivity
+    {
+        public string DateTimeToString(DateTime dateTime)
+        {
+            return dateTime.ToString("yyyy-MM-dd HH:mm");
+        }
+
+        public ICustomActivityResult Execute()
+        {
+            DateTime organizerStartTime = DateTime.Parse("2023-07-27T09:00:00");
+            DateTime organizerEndTime = DateTime.Parse("2023-07-27T12:00:00");
+            DateTime userBusyStartTime = DateTime.Parse("2023-07-27T09:30:00");
+            DateTime userBusyEndTime = DateTime.Parse("2023-07-27T10:30:00");
+
+            // Check if user is busy during organizer's time slot
+            if (userBusyStartTime >= organizerStartTime && userBusyStartTime < organizerEndTime)
+            {
+                // Adjust the available start time if the user's busy slot starts within the organizer's slot
+                organizerStartTime = userBusyEndTime;
+            }
+
+            if (userBusyEndTime > organizerStartTime && userBusyEndTime <= organizerEndTime)
+            {
+                // Adjust the available end time if the user's busy slot ends within the organizer's slot
+                organizerEndTime = userBusyStartTime;
+            }
+
+            if (organizerStartTime < organizerEndTime)
+            {
+                //Console.WriteLine("Available time slot for the meeting:");
+               return this.GenerateActivityResult(DateTimeToString(organizerStartTime) + " to " + DateTimeToString(organizerEndTime));
+            }
+            else
+            {
+                return this.GenerateActivityResult("No available time slot for the meeting.");
+            }
+
+            // You need to return a result here, but for this simple example, I'll just return null.
+            return null;
+        }
+    }
+}
